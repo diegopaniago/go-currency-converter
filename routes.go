@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/diegopaniago/go-currency-converter/product/api"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -10,6 +11,7 @@ func SetupRoutes(app *fiber.App) {
 		return c.Send([]byte("I am alive!"))
 	})
 
-	app.Post("/product", AddProduct)
-
+	// Product Handlers
+	app.Post("/product", api.AddProduct)
+	app.Get("/product/:id", api.GetProduct)
 }
