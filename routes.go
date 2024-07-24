@@ -1,7 +1,9 @@
 package main
 
 import (
-	"github.com/diegopaniago/go-currency-converter/product/api"
+	"encoding/json"
+
+	"github.com/diegopaniago/go-currency-converter/currency/service"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -11,7 +13,18 @@ func SetupRoutes(app *fiber.App) {
 		return c.Send([]byte("I am alive!"))
 	})
 
-	// Product Handlers
-	app.Post("/product", api.AddProduct)
-	app.Get("/product/:id", api.GetProduct)
+	app.Get("/currency/:code/:target", func(c fiber.Ctx) error {
+		currencyProvider := service.CurrencyProvider(service.CurrencyProviderImpl{})
+		code := c.Params("code")
+		target := c.Params("target")
+		currency, err := currencyProvider.GetCurrency(code, target)
+		if err != nil {
+			return c.Status(500).Send([]byte(err.Error()))
+		}
+		response, err := json.MarshalIndent(currency, "", "  ")
+		if err != nil {
+			return c.Status(500).Send([]byte(err.Error()))
+		}
+		return c.Send([]byte(response))
+	})
 }
