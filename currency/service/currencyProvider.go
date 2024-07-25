@@ -15,7 +15,9 @@ type CurrencyProvider interface {
 	GetCurrency(code string, target string) (model.Currency, error)
 }
 
-type CurrencyProviderImpl struct{}
+type CurrencyProviderImpl struct {
+	OriginURL string
+}
 
 type CotationResponse struct {
 	Code       string `json:"code"`
@@ -31,8 +33,9 @@ type CotationResponse struct {
 	CreateDate string `json:"create_date"`
 }
 
-func (CurrencyProviderImpl) GetCurrency(code string, target string) (model.Currency, error) {
-	res, err := http.Get(fmt.Sprintf("https://economia.awesomeapi.com.br/%s-%s", code, target))
+func (c CurrencyProviderImpl) GetCurrency(code string, target string) (model.Currency, error) {
+	url := fmt.Sprintf(c.OriginURL+"/%s-%s", code, target)
+	res, err := http.Get(url)
 	if err != nil {
 		return model.Currency{}, err
 	}
