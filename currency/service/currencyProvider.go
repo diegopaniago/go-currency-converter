@@ -33,36 +33,46 @@ type CotationResponse struct {
 	CreateDate string `json:"create_date"`
 }
 
-func (c CurrencyProviderImpl) GetCurrency(code string, targets []string) ([]model.Currency, error) {
-	//TODO: Refact to use goroutines to get all targets at the same time
-	results := make(chan model.Currency)
-
-	for _, target := range targets {
-		go fetchCurrency(code, target, results)
-	}
-
-	return results, nil
+type CurrencyTask struct {
+	Currency model.Currency
+	Err      error
 }
 
-func fetchCurrency(code string, target string, results chan<- model.Currency) (model.Currency, error) {
+func (c CurrencyProviderImpl) GetCurrency(code string, targets []string) ([]model.Currency, error) {
+	currencyTasks := make(chan CurrencyTask)
+	var currencies []model.Currency
+
+	for _, target := range targets {
+		go c.fetchCurrency(code, target, currencyTasks)
+	}
+
+	for i := 0; i < len(targets); i++ {
+		currencyTask := <-currencyTasks
+		currencies = append(currencies, currencyTask.Currency)
+	}
+
+	return currencies, nil
+}
+
+func (c CurrencyProviderImpl) fetchCurrency(code string, target string, currencyTasks chan<- CurrencyTask) {
 	url := fmt.Sprintf(c.OriginURL+"/%s-%s", code, target)
 	res, err := http.Get(url)
 
 	if err != nil {
-		return model.Currency{}, err
+		currencyTasks <- CurrencyTask{Err: err}
 	}
 	defer res.Body.Close()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return model.Currency{}, err
+		currencyTasks <- CurrencyTask{Err: err}
 	}
 	var cotations []CotationResponse
 	if err := json.Unmarshal(body, &cotations); err != nil {
-		return model.Currency{}, err
+		currencyTasks <- CurrencyTask{Err: err}
 	}
 	cotationPrice, err := strconv.ParseFloat(cotations[0].Bid, 64)
 	if err != nil {
-		return model.Currency{}, err
+		currencyTasks <- CurrencyTask{Err: err}
 	}
 	currency := model.Currency{
 		Code:  cotations[0].Code,
@@ -74,5 +84,5 @@ func fetchCurrency(code string, target string, results chan<- model.Currency) (m
 			Price: cotationPrice,
 		},
 	}
-	results <- currency
+	currencyTasks <- CurrencyTask{Currency: currency, Err: nil}
 }
