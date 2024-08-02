@@ -12,7 +12,7 @@ import (
 )
 
 type CurrencyProvider interface {
-	GetCurrency(code string, target string) (model.Currency, error)
+	GetCurrency(code string, targets []string) (model.Currency, error)
 }
 
 type CurrencyProviderImpl struct {
@@ -33,7 +33,9 @@ type CotationResponse struct {
 	CreateDate string `json:"create_date"`
 }
 
-func (c CurrencyProviderImpl) GetCurrency(code string, target string) (model.Currency, error) {
+func (c CurrencyProviderImpl) GetCurrency(code string, targets []string) (model.Currency, error) {
+	//TODO: Refact to use goroutines to get all targets at the same time
+	target := strings.Join(targets, ",")
 	url := fmt.Sprintf(c.OriginURL+"/%s-%s", code, target)
 	res, err := http.Get(url)
 	if err != nil {
