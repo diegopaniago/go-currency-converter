@@ -1,0 +1,11 @@
+.currency-box {
+    display: block;
+    width: 100%;
+    text-align: center;
+}
+
+textarea {
+    width: 70%;
+    height: 200px;
+    margin: 10px 0;
+}
