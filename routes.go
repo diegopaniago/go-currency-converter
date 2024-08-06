@@ -11,5 +11,5 @@ func SetupRoutes(app *fiber.App) {
 		return c.Send([]byte("I am alive!"))
 	})
 
-	app.Get("/currency/:code/:target", api.GetCurrency)
+	app.Get("/currency/:code", api.GetCurrency)
 }

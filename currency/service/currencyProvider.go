@@ -12,7 +12,7 @@ import (
 )
 
 type CurrencyProvider interface {
-	GetCurrency(code string, target string) (model.Currency, error)
+	GetCurrency(code string, targets []string) ([]model.Currency, error)
 }
 
 type CurrencyProviderImpl struct {
@@ -33,24 +33,57 @@ type CotationResponse struct {
 	CreateDate string `json:"create_date"`
 }
 
-func (c CurrencyProviderImpl) GetCurrency(code string, target string) (model.Currency, error) {
+type CurrencyTask struct {
+	Currency model.Currency
+	Err      error
+}
+
+func (c CurrencyProviderImpl) GetCurrency(code string, targets []string) ([]model.Currency, error) {
+	currencyTasks := make(chan CurrencyTask)
+	var currencies []model.Currency
+
+	for _, target := range targets {
+		go c.fetchCurrency(code, target, currencyTasks)
+	}
+
+	for i := 0; i < len(targets); i++ {
+		currencyTask := <-currencyTasks
+		if currencyTask.Err != nil {
+			return nil, currencyTask.Err
+		} else {
+			currencies = append(currencies, currencyTask.Currency)
+		}
+	}
+
+	return currencies, nil
+}
+
+func (c CurrencyProviderImpl) fetchCurrency(code string, target string, currencyTasks chan<- CurrencyTask) {
 	url := fmt.Sprintf(c.OriginURL+"/%s-%s", code, target)
 	res, err := http.Get(url)
+
 	if err != nil {
-		return model.Currency{}, err
+		currencyTasks <- CurrencyTask{Err: err}
+		return
+	}
+	if res.StatusCode != http.StatusOK {
+		currencyTasks <- CurrencyTask{Err: fmt.Errorf("error fetching currency %s to %s: %v", code, target, res.Status)}
 	}
 	defer res.Body.Close()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return model.Currency{}, err
+		currencyTasks <- CurrencyTask{Err: err}
+		return
 	}
 	var cotations []CotationResponse
 	if err := json.Unmarshal(body, &cotations); err != nil {
-		return model.Currency{}, err
+		currencyTasks <- CurrencyTask{Err: fmt.Errorf("error to unmarshal json: %v", err)}
+		return
 	}
 	cotationPrice, err := strconv.ParseFloat(cotations[0].Bid, 64)
 	if err != nil {
-		return model.Currency{}, err
+		currencyTasks <- CurrencyTask{Err: err}
+		return
 	}
 	currency := model.Currency{
 		Code:  cotations[0].Code,
@@ -62,5 +95,5 @@ func (c CurrencyProviderImpl) GetCurrency(code string, target string) (model.Cur
 			Price: cotationPrice,
 		},
 	}
-	return currency, nil
+	currencyTasks <- CurrencyTask{Currency: currency, Err: nil}
 }

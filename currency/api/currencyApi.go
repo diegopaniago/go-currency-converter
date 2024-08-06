@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/diegopaniago/go-currency-converter/currency/service"
 	"github.com/diegopaniago/go-currency-converter/settings"
@@ -13,8 +14,8 @@ func GetCurrency(c fiber.Ctx) error {
 		OriginURL: settings.Load().CurrencyApiUrl,
 	})
 	code := c.Params("code")
-	target := c.Params("target")
-	currency, err := currencyProvider.GetCurrency(code, target)
+	targets := c.Query("targets")
+	currency, err := currencyProvider.GetCurrency(code, strings.Split(targets, ","))
 	if err != nil {
 		return c.Status(500).Send([]byte(err.Error()))
 	}
