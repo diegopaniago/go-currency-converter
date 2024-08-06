@@ -48,7 +48,11 @@ func (c CurrencyProviderImpl) GetCurrency(code string, targets []string) ([]mode
 
 	for i := 0; i < len(targets); i++ {
 		currencyTask := <-currencyTasks
-		currencies = append(currencies, currencyTask.Currency)
+		if currencyTask.Err != nil {
+			return nil, currencyTask.Err
+		} else {
+			currencies = append(currencies, currencyTask.Currency)
+		}
 	}
 
 	return currencies, nil
@@ -60,19 +64,26 @@ func (c CurrencyProviderImpl) fetchCurrency(code string, target string, currency
 
 	if err != nil {
 		currencyTasks <- CurrencyTask{Err: err}
+		return
+	}
+	if res.StatusCode != http.StatusOK {
+		currencyTasks <- CurrencyTask{Err: fmt.Errorf("error fetching currency %s to %s: %v", code, target, res.Status)}
 	}
 	defer res.Body.Close()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		currencyTasks <- CurrencyTask{Err: err}
+		return
 	}
 	var cotations []CotationResponse
 	if err := json.Unmarshal(body, &cotations); err != nil {
-		currencyTasks <- CurrencyTask{Err: err}
+		currencyTasks <- CurrencyTask{Err: fmt.Errorf("error to unmarshal json: %v", err)}
+		return
 	}
 	cotationPrice, err := strconv.ParseFloat(cotations[0].Bid, 64)
 	if err != nil {
 		currencyTasks <- CurrencyTask{Err: err}
+		return
 	}
 	currency := model.Currency{
 		Code:  cotations[0].Code,
