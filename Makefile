@@ -3,5 +3,5 @@
 test:
 	go test -v ./...
 
-buid:
+build:
 	go build -o bin/ ./...
